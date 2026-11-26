@@ -1,0 +1,13 @@
+{
+  "name": "ai-research-assistant",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI Research Assistant - one-command setup and start for the whole project (client + server).",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "setup": "node scripts/setup.js",
+    "dev": "node scripts/dev.js",
+    "start": "node scripts/dev.js",
+    "db:check": "node scripts/check-db.js"
+  }
+}

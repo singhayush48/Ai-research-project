@@ -1,18 +1,63 @@
 // PostgreSQL connection pool.
 // Uses the 'pg' driver directly with parameterized queries everywhere.
-// Connection settings come from environment variables (see .env.example).
+//
+// Two ways to configure the connection (see .env.example):
+//   1. DATABASE_URL  -> a single connection string. Use this for a hosted
+//                       database such as Supabase or Neon (recommended: every
+//                       teammate shares the same central database).
+//   2. PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD -> a local PostgreSQL.
+// If DATABASE_URL is set it wins.
 
 const { Pool } = require('pg');
 
-const pool = new Pool({
-  host: process.env.PGHOST,
-  port: Number(process.env.PGPORT || 5432),
-  database: process.env.PGDATABASE,
-  user: process.env.PGUSER,
-  password: process.env.PGPASSWORD,
-  max: 10,
-  idleTimeoutMillis: 30000,
-});
+const DATABASE_URL = (process.env.DATABASE_URL || '').trim();
+
+function isLocalUrl(url) {
+  return /@(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/i.test(url);
+}
+
+// Hosted providers require TLS. Their certificate chains are not in Node's
+// default trust store, so we enable TLS without chain verification (the
+// connection is still encrypted). Set DB_SSL=off to disable TLS, or
+// DB_SSL=strict to fully verify the certificate.
+function sslOption(usingUrl, host) {
+  const mode = (process.env.DB_SSL || '').toLowerCase();
+  if (mode === 'off' || mode === 'false') return false;
+  if (mode === 'strict') return { rejectUnauthorized: true };
+  if (mode === 'on' || mode === 'true') return { rejectUnauthorized: false };
+  // auto: TLS for remote hosts, none for a local PostgreSQL
+  if (!usingUrl) return false;
+  return isLocalUrl(host) ? false : { rejectUnauthorized: false };
+}
+
+function buildConfig() {
+  if (DATABASE_URL) {
+    // Remove "?sslmode=..." from the URL: newer pg versions would otherwise
+    // override our ssl option with strict verification and fail on hosted DBs.
+    const cleaned = DATABASE_URL.replace(/([?&])sslmode=[^&]*&?/i, '$1').replace(/[?&]$/, '');
+    return {
+      connectionString: cleaned,
+      ssl: sslOption(true, DATABASE_URL),
+      // Free hosted tiers allow only a limited number of connections shared
+      // by everyone on the team, so keep each machine's pool small.
+      max: Number(process.env.DB_POOL_MAX || 5),
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 15000,
+    };
+  }
+  return {
+    host: process.env.PGHOST,
+    port: Number(process.env.PGPORT || 5432),
+    database: process.env.PGDATABASE,
+    user: process.env.PGUSER,
+    password: process.env.PGPASSWORD,
+    ssl: sslOption(false, ''),
+    max: Number(process.env.DB_POOL_MAX || 10),
+    idleTimeoutMillis: 30000,
+  };
+}
+
+const pool = new Pool(buildConfig());
 
 pool.on('error', (err) => {
   // Unexpected errors on idle clients should not crash the whole server.
@@ -52,4 +97,4 @@ async function withTransaction(fn) {
   }
 }
 
-module.exports = { pool, query, withTransaction };
+module.exports = { pool, query, withTransaction, usingConnectionString: Boolean(DATABASE_URL) };

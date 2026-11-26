@@ -1,5 +1,7 @@
 # AI Research Assistant
 
+> **Quick start with a shared cloud database (recommended): see [TEAM_SETUP.md](TEAM_SETUP.md)** — no local PostgreSQL needed; just `npm run setup`, add `server/.env`, `npm run dev`.
+
 A full-stack academic research assistant that helps a user create research projects, search real academic papers (via OpenAlex), save and analyze them with AI, compare multiple papers, identify research gaps, keep notes, and generate a structured research draft — built strictly to a **React + Node.js/Express + PostgreSQL** stack with no unnecessary libraries.
 
 This is a 4-member B.Tech CSE capstone project.
@@ -529,3 +531,128 @@ indices remapped to the original selected-source order.
 The automated checks included with this patch use Node's built-in test runner:
 `node --test server/tests/aiService.test.js`. A live provider test still
 requires a valid API key, credits, and a currently available model.
+Quick start
+
+You need only Node.js 18 or newer (the LTS installer is fine). You do not need to install PostgreSQL.
+
+1. Install
+bash
+git clone https://github.com/singhayush48/Ai-research-project.git
+cd Ai-research-project
+npm run setup
+
+(or unzip the project and run npm run setup inside the folder). This installs the server and client and creates server/.env.
+
+2. Configure server/.env
+
+Open server/.env and fill in these three things:
+
+env
+DATABASE_URL=postgresql://postgres.YOUR_PROJECT_REF:YOUR_PASSWORD@aws-0-REGION.pooler.supabase.com:5432/postgres
+AI_API_KEY=your_openrouter_key
+AUTH_TOKEN_SECRET=any_long_random_text
+DATABASE_URL: in Supabase click Connect → Session pooler and copy the string. If you are joining an existing team, the project owner sends you this. Full steps: TEAM_SETUP.md.
+AI_API_KEY: create a free key at https://openrouter.ai/keys.
+AUTH_TOKEN_SECRET: generate one with node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+3. Run
+bash
+npm run db:check    # confirms the database connection works
+npm run dev         # starts the API and the website together
+
+Open http://localhost:5173. Tables are created automatically on the first start.
+
+4. Default logins and demo data
+
+With AUTO_SEED_DEMO=on (the default in .env.example), the first time the server starts on an empty database it creates these accounts and sample data automatically. You can also add them any time with npm run db:seed, or by pasting database/supabase_setup_and_demo_data.sql into the Supabase SQL Editor.
+
+Name	Email	Password
+Demo User	demo@example.com	Demo@1234
+Alice Sharma	alice@example.com	Demo@1234
+Bob Verma	bob@example.com	Demo@1234
+The login page shows one-click Demo accounts buttons while you run npm run dev. In a production build they are hidden unless you set VITE_SHOW_DEMO_LOGIN=true.
+Sample data: 4 projects, 5 real papers, notes, saved papers and chat messages, all marked [DEMO].
+Auto-seeding never runs if the database already has any user, so real data is never mixed with demo data.
+Before real use, set AUTO_SEED_DEMO=off in server/.env and run npm run db:seed -- --remove, because the demo password is public.
+Commands (run from the project root)
+Command	What it does
+npm run setup	Installs server + client dependencies and creates server/.env
+npm run dev	Starts the API (port 5000) and the website (port 5173) together
+npm run db:check	Tests the database connection and explains any error
+npm run db:seed	Adds demo users, projects, papers and notes (safe to repeat)
+npm run db:seed -- --reset	Deletes the demo data and adds it again
+npm run db:seed -- --remove	Deletes the demo data only
+Environment variables (server/.env)
+Variable	Required	Description
+DATABASE_URL	Yes*	PostgreSQL connection string (Supabase Session pooler recommended)
+AUTH_TOKEN_SECRET	Yes	Long random text used to sign login sessions
+AI_API_KEY	Yes	Key for the AI provider
+AI_PROVIDER	No	openrouter (default) or anthropic
+AI_API_URL	No	Provider endpoint (default: OpenRouter chat completions)
+AI_MODEL	No	Model name (default: openrouter/free)
+OPENALEX_CONTACT_EMAIL	No	Your email; gives OpenAlex's faster "polite" rate limit
+PORT	No	API port (default 5000)
+CLIENT_ORIGIN	No	Allowed website origin(s), comma separated
+AUTO_SEED_DEMO	No	on = create demo accounts + sample data on a brand-new empty database; off = never (default in .env.example: on)
+DB_SSL	No	on / off / strict. Automatic by default (TLS for hosted databases)
+DB_POOL_MAX	No	Database connections per computer (default 5 hosted, 10 local)
+
+* Instead of DATABASE_URL you can use a local PostgreSQL with PGHOST, PGPORT, PGDATABASE, PGUSER, PGPASSWORD. See .env.example for the complete list, including AI timeout, retry and cache options.
+
+Working as a team
+Everyone runs the app on their own computer; all of you share the one cloud database.
+Each person registers their own account and sees only their own projects, notes and saved papers.
+Share server/.env privately (direct message or password manager). Never commit it or post it publicly — it holds the database password and AI key.
+Project structure
+.
+├── client/                 React + Vite website
+│   └── src/ (pages, components, services/api.js, styles)
+├── server/                 Express API
+│   ├── server.js, app.js   startup and middleware
+│   ├── routes/ controllers/ services/   API, logic, AI + OpenAlex clients
+│   ├── db/                 pool.js (connection), init.js (auto schema), seed.js
+│   └── tests/
+├── database/
+│   ├── schema.sql                          all tables (applied automatically)
+│   └── supabase_setup_and_demo_data.sql    one-paste Supabase script: tables + demo data
+├── scripts/                setup, dev, db:check helpers
+├── docs/PROJECT_REPORT.md  detailed report: architecture, schema, API list, viva Q&A
+├── TEAM_SETUP.md           step-by-step Supabase + team guide
+└── .env.example            template for server/.env
+API overview
+
+All routes start with /api and (except register/login) need a logged-in session.
+
+Area	Routes
+Auth	POST /auth/register, POST /auth/login, POST /auth/logout, GET /auth/me
+Projects	GET/POST /projects, GET/PUT/DELETE /projects/:id, GET /projects/:id/timeline, POST /projects/:id/papers, DELETE /projects/:id/papers/:paperId
+Papers	GET /papers/search, GET /papers/saved, GET /papers/:id, POST /papers/save, DELETE /papers/save/:id
+Notes	GET/POST /notes, PUT/DELETE /notes/:id
+AI	POST /ai/chat, /ai/analyze-sources, /ai/research-gaps, /ai/research-plan, /ai/generate-draft, /ai/copilot, /ai/compare-papers, /ai/analyze-paper, …
+Other	GET /dashboard, GET /health
+
+The full list with request and response examples is in docs/PROJECT_REPORT.md.
+
+Troubleshooting
+
+Run npm run db:check first — it names the problem. The usual ones:
+
+Message	Fix
+getaddrinfo ENOTFOUND db.….supabase.co	You used the Direct connection string. Use Session pooler (host ends in .pooler.supabase.com)
+password authentication failed	Wrong password in DATABASE_URL; re-copy it or reset the password in Supabase
+Invalid URL	Password has special characters (@ : / # ?). Reset it to letters and numbers only
+self-signed certificate	Add DB_SSL=on to server/.env
+App suddenly can't connect	Supabase pauses free projects after 1 week idle. Click Resume project in the dashboard
+Dependencies are not installed yet	Run npm run setup
+Port 5000 / 5173 already in use	Close the other program or change PORT in server/.env
+
+More detail in TEAM_SETUP.md.
+
+Tests
+bash
+cd server
+node --test tests/aiService.test.js
+More documentation
+TEAM_SETUP.md — create the Supabase database and onboard teammates
+docs/PROJECT_REPORT.md — architecture, schema, full API, testing checklist
+SETUP.md — older manual setup with a local PostgreSQL
+PROJECT_STATE.md — development history, pass by pass

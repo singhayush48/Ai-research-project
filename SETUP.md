@@ -1,5 +1,7 @@
 # SETUP.md — AI Research Assistant
 
+> **New:** the easiest way to run this project is now the shared cloud database flow in [TEAM_SETUP.md](TEAM_SETUP.md). This file describes the older manual setup with a *local* PostgreSQL, which still works (leave `DATABASE_URL` empty and use the `PG*` variables).
+
 Complete instructions for running this project locally. No real API keys
 are included anywhere in this file or in the repository — you provide
 your own.
