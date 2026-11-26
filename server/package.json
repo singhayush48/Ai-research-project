@@ -1,0 +1,17 @@
+{
+  "name": "ai-research-assistant-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "description": "Backend for AI Research Assistant (Express + PostgreSQL). Only runtime dependency is the pg driver, per project no-extra-library policy.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "nodemon": "^3.1.14",
+    "pg": "^8.11.5"
+  }
+}
